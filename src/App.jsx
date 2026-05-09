@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState ,useMemo } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -10,6 +10,15 @@ import {
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+delete L.Icon.Default.prototype._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
 
 /* =========================
    📍 AUTO LOCATION
@@ -122,20 +131,24 @@ function LocateButton({
 function ZoomToFiltered({ data }) {
   const map = useMap();
 
-  useEffect(() => {
-    if (!data || !data.features?.length)
-      return;
+useEffect(() => {
+  if (!data || !data.features?.length) return;
 
-    const group = L.featureGroup(
-      data.features.map((f) =>
-        L.geoJSON(f)
-      )
-    );
+  // 🟢 run only once per filter change
+  const group = L.featureGroup(
+    data.features.map((f) => L.geoJSON(f))
+  );
 
-    map.fitBounds(group.getBounds(), {
-      padding: [40, 40],
+  const bounds = group.getBounds();
+
+  // ❗ prevent repeated zoom jumps
+  if (bounds.isValid()) {
+    map.fitBounds(bounds, {
+      padding: [20, 20],
+      animate: true,
     });
-  }, [data]);
+  }
+}, [data, map]);
 
   return null;
 }
@@ -210,30 +223,22 @@ export default function App() {
 ========================= */
 
   // 🔥 Default = show all
-  let visibleData = geoData;
+const visibleData = useMemo(() => {
+  if (!geoData) return null;
 
   // 🔥 SEC FILTER
-  if (
-    mode === "sec" &&
-    selectedSec &&
-    geoData
-  ) {
-    visibleData = {
+  if (mode === "sec" && selectedSec) {
+    return {
       ...geoData,
       features: geoData.features.filter(
-        (f) =>
-          f.properties.sec === selectedSec
+        (f) => f.properties.sec === selectedSec
       ),
     };
   }
 
   // 🔥 NEARBY FILTER
-  if (
-    mode === "nearby" &&
-    myLocation &&
-    geoData
-  ) {
-    visibleData = {
+  if (mode === "nearby" && myLocation) {
+    return {
       ...geoData,
       features: getNearbyFeatures(
         geoData,
@@ -242,6 +247,10 @@ export default function App() {
       ),
     };
   }
+
+  // 🔥 DEFAULT = show all
+  return geoData;
+}, [geoData, mode, selectedSec, myLocation]);
 
   /* =========================
      UNIT TYPE COUNTS
