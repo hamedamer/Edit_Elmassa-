@@ -1,4 +1,4 @@
-import { useEffect, useState ,useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -60,12 +60,6 @@ function LocateButton({
       return;
     }
 
-    // 🔥 Reset dropdown
-    setSelectedSec("");
-
-    // 🔥 show all data
-    setMode("none");
-
     navigator.geolocation.getCurrentPosition((pos) => {
       const coords = [
         pos.coords.latitude,
@@ -74,7 +68,7 @@ function LocateButton({
 
       setMyLocation(coords);
 
-      // 🔥 zoom to location
+      // 🔥 move only
       map.flyTo(coords, 18);
     });
   };
@@ -131,24 +125,20 @@ function LocateButton({
 function ZoomToFiltered({ data }) {
   const map = useMap();
 
-useEffect(() => {
-  if (!data || !data.features?.length) return;
+  useEffect(() => {
+    if (!data || !data.features?.length)
+      return;
 
-  // 🟢 run only once per filter change
-  const group = L.featureGroup(
-    data.features.map((f) => L.geoJSON(f))
-  );
+    const group = L.featureGroup(
+      data.features.map((f) =>
+        L.geoJSON(f)
+      )
+    );
 
-  const bounds = group.getBounds();
-
-  // ❗ prevent repeated zoom jumps
-  if (bounds.isValid()) {
-    map.fitBounds(bounds, {
-      padding: [20, 20],
-      animate: true,
+    map.fitBounds(group.getBounds(), {
+      padding: [40, 40],
     });
-  }
-}, [data, map]);
+  }, [data]);
 
   return null;
 }
@@ -156,29 +146,29 @@ useEffect(() => {
 /* =========================
    📍 Nearby Features
 ========================= */
-function getNearbyFeatures(
-  data,
-  userLocation,
-  radius = 50
-) {
-  if (!data || !userLocation) return [];
+// function getNearbyFeatures(
+//   data,
+//   userLocation,
+//   radius = 50
+// ) {
+//   if (!data || !userLocation) return [];
 
-  return data.features.filter((feature) => {
-    // 🔥 create leaflet layer
-    const layer = L.geoJSON(feature);
+//   return data.features.filter((feature) => {
+//     // 🔥 create leaflet layer
+//     const layer = L.geoJSON(feature);
 
-    // 🔥 get center of polygon
-    const center =
-      layer.getBounds().getCenter();
+//     // 🔥 get center of polygon
+//     const center =
+//       layer.getBounds().getCenter();
 
-    // 🔥 calculate distance
-    const distance = center.distanceTo(
-      L.latLng(userLocation)
-    );
+//     // 🔥 calculate distance
+//     const distance = center.distanceTo(
+//       L.latLng(userLocation)
+//     );
 
-    return distance <= radius;
-  });
-}
+//     return distance <= radius;
+//   });
+// }
 
 /* =========================
    MAIN APP
@@ -193,8 +183,7 @@ export default function App() {
   const [myLocation, setMyLocation] =
     useState(null);
 
-  const [mode, setMode] =
-    useState("none");
+  const [mode, setMode] = useState("idle");
 
   /* =========================
      LOAD GEOJSON
@@ -223,34 +212,25 @@ export default function App() {
 ========================= */
 
   // 🔥 Default = show all
-const visibleData = useMemo(() => {
-  if (!geoData) return null;
+  const visibleData = useMemo(() => {
+    if (!geoData) return null;
 
-  // 🔥 SEC FILTER
-  if (mode === "sec" && selectedSec) {
+    // 🔥 أول ما يفتح الموقع
+    if (!selectedSec) {
+      return {
+        ...geoData,
+        features: [],
+      };
+    }
+
+    // 🔥 عرض القسم المختار فقط
     return {
       ...geoData,
       features: geoData.features.filter(
         (f) => f.properties.sec === selectedSec
       ),
     };
-  }
-
-  // 🔥 NEARBY FILTER
-  if (mode === "nearby" && myLocation) {
-    return {
-      ...geoData,
-      features: getNearbyFeatures(
-        geoData,
-        myLocation,
-        50
-      ),
-    };
-  }
-
-  // 🔥 DEFAULT = show all
-  return geoData;
-}, [geoData, mode, selectedSec, myLocation]);
+  }, [geoData, selectedSec]);
 
   /* =========================
      UNIT TYPE COUNTS
@@ -271,11 +251,9 @@ const visibleData = useMemo(() => {
   /* =========================
    DYNAMIC TITLE
 ========================= */
-  const sectionTitle =
-    mode === "sec" && selectedSec
-      ? ` طلبات تعديل   ${selectedSec}`
-      : "جميع طلبات التعديل ";
-
+const sectionTitle = selectedSec
+  ? `📍 طلبات تعديل ${selectedSec}`
+  : "⚠️ برجاء اختيار القسم لعرض الطلبات";
   /* =========================
      POPUP
   ========================= */
@@ -297,7 +275,7 @@ const visibleData = useMemo(() => {
   };
 
   return (<>
- 
+
     <div style={styles.page}>
       {/* HEADER */}
       <div style={styles.header}>
@@ -310,11 +288,15 @@ const visibleData = useMemo(() => {
           style={styles.input}
           value={selectedSec}
           onChange={(e) => {
-            setSelectedSec(
-              e.target.value
-            );
+            const value = e.target.value;
 
-            setMode("sec");
+            if (!value) {
+              alert("برجاء اختيار القسم الخاص بكم");
+              return;
+            }
+
+            setSelectedSec(value);
+            // setMode("sec");
           }}
         >
           <option value="">
@@ -335,7 +317,8 @@ const visibleData = useMemo(() => {
           style={styles.button}
           onClick={() => {
             setSelectedSec("");
-            setMode("none");
+            setMyLocation(null);
+            // setMode("idle");
           }}
         >
           Reset
@@ -417,24 +400,24 @@ const visibleData = useMemo(() => {
 
           {/* 🏢 GEOJSON */}
           {visibleData &&
-            visibleData.features
-              .length > 0 && (
+            visibleData.features &&
+            visibleData.features.length > 0 && (
               <GeoJSON
+                key={selectedSec || "empty"}
                 data={visibleData}
-                onEachFeature={
-                  onEachFeature
-                }
+                onEachFeature={onEachFeature}
               />
             )}
         </MapContainer>
       </div>
-          {/* FOOTER */}
-<div style={styles.footer}>
-© 2026 Built by Hamed Amer — GIS Developer 👨‍💻
-</div>
+      {/* FOOTER */}
+      <div style={styles.footer}>
+        © 2026 Built by Hamed Amer — GIS Developer 👨‍💻
+      </div>
     </div>
+    
 
-   </>);
+  </>);
 }
 
 /* =========================
@@ -459,32 +442,41 @@ const styles = {
   statsTitle: {
     width: "fit-content",
 
-    margin: "10px auto",
+    margin: "12px auto",
 
     padding:
       window.innerWidth < 768
-        ? "8px 14px"
-        : "10px 20px",
+        ? "12px 18px"
+        : "14px 24px",
 
-    background: "#ffffff",
+    background:
+      "linear-gradient(135deg, #fef3c7, #fde68a)",
 
-    borderRadius: "999px",
+    border: "1px solid #f59e0b",
+
+    borderRadius: "14px",
 
     fontWeight: "bold",
 
     fontSize:
       window.innerWidth < 768
         ? "13px"
-        : "18px",
+        : "17px",
 
-    color: "#111827",
-
-    boxShadow:
-      "0 2px 10px rgba(0,0,0,0.1)",
-
-    border: "1px solid #e5e7eb",
+    color: "#92400e",
 
     textAlign: "center",
+
+    boxShadow:
+      "0 4px 14px rgba(245,158,11,0.25)",
+
+    display: "flex",
+
+    alignItems: "center",
+
+    gap: "8px",
+
+    animation: "pulse 1.5s infinite",
   },
 
 
