@@ -9,6 +9,7 @@ import {
 } from "react-leaflet";
 
 import "leaflet/dist/leaflet.css";
+import "./popup.css";
 import L from "leaflet";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -266,15 +267,22 @@ const sectionTitle = selectedSec
   ) => {
     const p = feature.properties;
 
-    layer.bindPopup(`
-      <div style="font-family: Arial; font-size: 12px">
-        <b>Name:</b> ${p.name || "-"} <br/>
-        <b>Sec:</b> ${p.sec || "-"} <br/>
-        <b>Type:</b> ${p.unittype || "-"} <br/>
-        <b>Street:</b> ${p.streetname || "-"} <br/>
-        <b>Phone:</b> ${p.phone || "-"}
-      </div>
-    `);
+layer.bindPopup(
+  `
+    <div style="font-family: Arial; font-size: 12px">
+      <b>requestnum:</b> ${p.requestnum || "-"} <br/>
+      <b>Name:</b> ${p.name || "-"} <br/>
+      <b>Sec:</b> ${p.sec || "-"} <br/>
+      <b>Type:</b> ${p.unittype || "-"} <br/>
+      <b>Street:</b> ${p.streetname || "-"} <br/>
+      <b>Phone:</b> ${p.phone || "-"}
+    </div>
+  `,
+  {
+    maxWidth: 300,
+    minWidth: 220,
+  }
+);
   };
 
   return (<>
